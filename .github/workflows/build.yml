@@ -1,0 +1,54 @@
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "source_branch"
+        default: "Origin-Tetris"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: samakshkambxj/Origin-Kernel
+          ref: ${{ inputs.branch }}
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential clang flex \
+            libelf-dev libssl-dev lld llvm pahole python3 rsync zip
+
+      # If the branch uses KernelSU-Next, swap it for ReSukiSU
+      - name: Check root driver
+        run: |
+          URL=$(git config -f .gitmodules submodule.KernelSU.url || true)
+          echo "Root driver: $URL"
+          if echo "$URL" | grep -qi "KernelSU-Next"; then
+            rm -rf KernelSU
+            git clone https://github.com/ReSukiSU/ReSukiSU KernelSU
+            git -C KernelSU checkout 9cf787a7127d835b41753074d0b91f376351d264
+          fi
+
+      - name: Build
+        run: |
+          make O=out ARCH=arm64 gki_defconfig
+          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 \
+            KCFLAGS="-Wno-error=uninitialized -Wno-error=sometimes-uninitialized -Wno-error=attribute-warning -Wno-frame-larger-than" \
+            -j"$(nproc)"
+
+      - name: Collect output
+        run: |
+          mkdir artifacts
+          cp out/arch/arm64/boot/Image artifacts/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tetris-kernel
+          path: artifacts/
+          if-no-files-found: error

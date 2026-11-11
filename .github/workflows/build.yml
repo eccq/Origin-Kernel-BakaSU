@@ -35,8 +35,9 @@ jobs:
           echo "CONFIG_KSU=y" >> arch/arm64/configs/gki_defconfig
 
       - name: Build
+        env:
+          KCFLAGS: -Wno-error=uninitialized -Wno-error=sometimes-uninitialized -Wno-error=attribute-warning -Wno-frame-larger-than
         run: |
           make O=out ARCH=arm64 gki_defconfig
           grep -q "^CONFIG_KSU=y" out/.config || { echo "KSU not enabled"; exit 1; }
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 \
-            KCFLAGS="-Wno-error=uninitialized -Wno-error=sometimes-uninitialized
+          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 -j$(nproc)

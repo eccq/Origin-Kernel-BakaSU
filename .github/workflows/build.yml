@@ -1,11 +1,7 @@
-name: build
+name: Build
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: "source_branch"
-        default: "Origin-Tetris"
 
 jobs:
   build:
@@ -14,9 +10,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: samakshkambxj/Origin-Kernel
-          ref: ${{ inputs.branch }}
+          ref: mt6878/Tetris/16b
           fetch-depth: 1
-          submodules: recursive
 
       - name: Install dependencies
         run: |
@@ -24,20 +19,20 @@ jobs:
           sudo apt-get install -y bc bison build-essential clang flex \
             libelf-dev libssl-dev lld llvm pahole python3 rsync zip
 
-      # If the branch uses KernelSU-Next, swap it for ReSukiSU
-      - name: Check root driver
+      # Add ReSukiSU to the kernel tree (same version as the Galaxian build)
+      - name: Add root driver
         run: |
-          URL=$(git config -f .gitmodules submodule.KernelSU.url || true)
-          echo "Root driver: $URL"
-          if echo "$URL" | grep -qi "KernelSU-Next"; then
-            rm -rf KernelSU
-            git clone https://github.com/ReSukiSU/ReSukiSU KernelSU
-            git -C KernelSU checkout 9cf787a7127d835b41753074d0b91f376351d264
-          fi
+          git clone https://github.com/ReSukiSU/ReSukiSU KernelSU
+          git -C KernelSU checkout 9cf787a7127d835b41753074d0b91f376351d264
+          ln -sfn ../KernelSU/kernel drivers/kernelsu
+          grep -q kernelsu drivers/Makefile || echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
+          grep -q kernelsu drivers/Kconfig || sed -i '$i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
+          echo "CONFIG_KSU=y" >> arch/arm64/configs/gki_defconfig
 
       - name: Build
         run: |
           make O=out ARCH=arm64 gki_defconfig
+          grep -q "^CONFIG_KSU=y" out/.config || { echo "KSU not enabled"; exit 1; }
           make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 \
             KCFLAGS="-Wno-error=uninitialized -Wno-error=sometimes-uninitialized -Wno-error=attribute-warning -Wno-frame-larger-than" \
             -j"$(nproc)"

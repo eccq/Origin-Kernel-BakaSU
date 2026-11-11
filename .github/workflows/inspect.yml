@@ -1,0 +1,36 @@
+name: tetris
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: samakshkambxj/Origin-Kernel
+          ref: mt6878/Tetris/16b
+          submodules: false
+
+      - name: Root
+        run: ls -la
+
+      - name: README build
+        run: grep -n -i -A40 "building from source" README.md || true
+
+      - name: Workflow originali
+        run: |
+          ls -la .github/workflows/ 2>/dev/null || echo "nessun workflow"
+          cat .github/workflows/*.yml 2>/dev/null | head -250
+
+      - name: Config
+        run: |
+          ls build.config* 2>/dev/null || true
+          ls arch/arm64/configs/ | head -80
+          cat .gitmodules 2>/dev/null || true
+
+      - name: KernelSU
+        run: |
+          ls -la KernelSU drivers/kernelsu 2>/dev/null | head -20 || true
+          grep -rn -i kernelsu drivers/Makefile drivers/Kconfig || true

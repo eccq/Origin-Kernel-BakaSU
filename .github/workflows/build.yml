@@ -38,6 +38,21 @@ jobs:
         env:
           KCFLAGS: -Wno-error=uninitialized -Wno-error=sometimes-uninitialized -Wno-error=attribute-warning -Wno-frame-larger-than
         run: |
-          make O=out ARCH=arm64 gki_defconfig
+          M="make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1"
+          $M gki_defconfig
+          scripts/config --file out/.config -d KASAN -d UBSAN
+          $M olddefconfig
           grep -q "^CONFIG_KSU=y" out/.config || { echo "KSU not enabled"; exit 1; }
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 -j$(nproc)
+          grep -E "^CONFIG_(KASAN|UBSAN)=" out/.config || echo "KASAN/UBSAN off"
+          $M -j$(nproc)
+
+      - name: Collect output
+        run: |
+          mkdir artifacts
+          cp out/arch/arm64/boot/Image artifacts/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tetris-kernel
+          path: artifacts/
+          if-no-files-found: error
